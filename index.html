@@ -83,6 +83,10 @@ form.stack{display:flex;flex-direction:column;gap:10px;width:100%}
 .field input:focus{outline:2px solid var(--gold);outline-offset:1px;border-color:transparent}
 .msg{font-size:13px;margin:0;min-height:1.2em;color:var(--ink-dim)}
 .msg.err{color:var(--signal)}
+.tabs{display:grid;grid-template-columns:1fr 1fr;width:100%;border:1px solid #ffffff26;border-radius:10px;padding:3px;gap:3px}
+.tabs button{font:700 14px var(--body);background:none;border:0;color:var(--ink-dim);padding:9px;border-radius:8px;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--void-2);color:var(--ink)}
+.tabs button:focus-visible{outline:2px solid var(--gold);outline-offset:1px}
 .kv{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%}
 .kv .stat{align-items:center}
 .kv .stat b{font-size:20px}
@@ -146,26 +150,49 @@ form.stack{display:flex;flex-direction:column;gap:10px;width:100%}
   </div>
   <div class="overlay" id="account" hidden>
     <div class="panel">
-      <div id="loginView" class="panel" style="padding:0">
-        <h2>Tu cuenta</h2>
-        <p class="lede">Guarda tu récord en la nube, juega en el PC o en el móvil y entra en el ranking mundial. Sin contraseñas.</p>
-        <form class="stack" id="emailForm">
-          <label class="field" for="emailInput">Tu email
-            <input id="emailInput" type="email" autocomplete="email" required placeholder="tu@email.com">
-          </label>
-          <button class="btn" type="submit" id="emailBtn">Enviarme el acceso</button>
-        </form>
-        <form class="stack" id="codeForm" hidden>
-          <p class="lede" id="codeLede"></p>
-          <label class="field" for="codeInput">Código del email (si lo trae)
-            <input id="codeInput" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="123456">
-          </label>
-          <button class="btn" type="submit">Entrar con el código</button>
-          <button class="link" type="button" id="otherEmail">Usar otro email</button>
-        </form>
+      <h2 id="accTitle">Tu cuenta</h2>
+      <div class="tabs" id="authTabs" role="tablist">
+        <button type="button" role="tab" id="tabLogin" aria-selected="true">Entrar</button>
+        <button type="button" role="tab" id="tabSignup" aria-selected="false">Crear cuenta</button>
       </div>
+      <form class="stack" id="loginForm">
+        <label class="field" for="loginUser">Usuario o email
+          <input id="loginUser" autocomplete="username" autocapitalize="off" spellcheck="false" required>
+        </label>
+        <label class="field" for="loginPass">Contraseña
+          <input id="loginPass" type="password" autocomplete="current-password" required>
+        </label>
+        <button class="btn" type="submit">Entrar</button>
+        <button class="link" type="button" id="forgotBtn">¿Has olvidado la contraseña?</button>
+      </form>
+      <form class="stack" id="signupForm" hidden>
+        <label class="field" for="suUser">Nombre de usuario (3 a 16 letras, números o _)
+          <input id="suUser" autocomplete="username" autocapitalize="off" spellcheck="false" maxlength="16" required>
+        </label>
+        <label class="field" for="suEmail">Email (solo para recuperar la contraseña)
+          <input id="suEmail" type="email" autocomplete="email" required>
+        </label>
+        <label class="field" for="suPass">Contraseña (mínimo 6 caracteres)
+          <input id="suPass" type="password" autocomplete="new-password" minlength="6" required>
+        </label>
+        <button class="btn" type="submit">Crear cuenta</button>
+      </form>
+      <form class="stack" id="forgotForm" hidden>
+        <p class="lede">Escribe el email de tu cuenta y te enviaremos un enlace para crear una contraseña nueva.</p>
+        <label class="field" for="fgEmail">Email
+          <input id="fgEmail" type="email" autocomplete="email" required>
+        </label>
+        <button class="btn" type="submit">Enviar enlace</button>
+        <button class="link" type="button" id="backLogin">Volver a entrar</button>
+      </form>
+      <form class="stack" id="resetForm" hidden>
+        <p class="lede">Elige tu nueva contraseña.</p>
+        <label class="field" for="newPass">Nueva contraseña (mínimo 6 caracteres)
+          <input id="newPass" type="password" autocomplete="new-password" minlength="6" required>
+        </label>
+        <button class="btn" type="submit">Guardar contraseña</button>
+      </form>
       <div id="profileView" class="panel" style="padding:0" hidden>
-        <h2>Piloto</h2>
         <div class="kv">
           <div class="stat"><b id="pBest">0</b><span>Récord</span></div>
           <div class="stat"><b id="pCoins">0</b><span>Monedas</span></div>
@@ -173,7 +200,7 @@ form.stack{display:flex;flex-direction:column;gap:10px;width:100%}
         </div>
         <form class="stack" id="nameForm">
           <label class="field" for="nameInput">Nombre en el ranking (3 a 16 letras, números o _)
-            <input id="nameInput" maxlength="16" autocomplete="nickname">
+            <input id="nameInput" maxlength="16" autocomplete="nickname" autocapitalize="off" spellcheck="false">
           </label>
           <button class="ghost" type="submit">Guardar nombre</button>
         </form>
@@ -193,6 +220,8 @@ form.stack{display:flex;flex-direction:column;gap:10px;width:100%}
 const DONATE_URL = "https://ko-fi.com/"; // ← cambia esto por tu página de Ko-fi / Buy Me a Coffee
 const SUPABASE_URL = "https://wbsruxvsgygtlvfowjuu.supabase.co";
 const SUPABASE_KEY = "sb_publishable_W9W1qSOWdGTDZR8Qwxju9A_ncUiKR8i"; // clave pública: puede ir en la web
+// Clave pública "anon" (formato antiguo). Solo la usa el inicio de sesión por nombre de usuario.
+const SUPABASE_ANON_JWT = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indic3J1eHZzZ3lndGx2Zm93anV1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxMzMzNDQsImV4cCI6MjEwODcwOTM0NH0.nJgomraWoedeVmwHqqB8C_xsq7XxHiazVOjdk40s7HE";
 document.getElementById('donateLink').href = DONATE_URL;
 
 const cvs = document.getElementById('game'), ctx = cvs.getContext('2d');
@@ -520,7 +549,7 @@ function draw(){
 }
 
 // ====== Cuentas, récord en la nube y ranking ======
-let sb = null, session = null, profile = null, returnTo = 'menu', pendingEmail = '';
+let sb = null, session = null, profile = null, returnTo = 'menu', recovering = false;
 try { sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY); } catch(e){ sb = null; }
 const fmt = n => Math.floor(n).toLocaleString('es-ES');
 
@@ -612,7 +641,14 @@ async function flushPending(){
 }
 
 // --- pantalla de cuenta ---
+const LOGIN_FN = SUPABASE_URL + '/functions/v1/login-username';
+const NAME_RE = /^[A-Za-z0-9_áéíóúñÁÉÍÓÚÑ]{3,16}$/;
+const VIEWS = ['loginForm', 'signupForm', 'forgotForm', 'resetForm', 'profileView'];
+const FIRST = { loginForm: 'loginUser', signupForm: 'suUser', forgotForm: 'fgEmail', resetForm: 'newPass', profileView: 'nameInput' };
+const TITLES = { loginForm: 'Tu cuenta', signupForm: 'Tu cuenta', forgotForm: 'Recuperar contraseña', resetForm: 'Nueva contraseña', profileView: 'Piloto' };
+
 function accMsg(text, err){ const m = $('accMsg'); m.textContent = text; m.className = 'msg' + (err ? ' err' : ''); }
+function busy(form, on){ form.querySelectorAll('button').forEach(b => b.disabled = on); }
 function fillProfile(){
   if (!profile) return;
   $('pBest').textContent = fmt(profile.best_score);
@@ -620,63 +656,122 @@ function fillProfile(){
   $('pGames').textContent = fmt(profile.games);
   if (document.activeElement !== $('nameInput')) $('nameInput').value = profile.username;
 }
-function openAccount(){
-  if (state === 'play') return;
-  returnTo = state === 'over' ? 'over' : 'menu';
-  const logged = !!session;
-  $('loginView').hidden = logged; $('profileView').hidden = !logged;
-  $('emailForm').hidden = !!pendingEmail; $('codeForm').hidden = !pendingEmail;
-  accMsg(''); fillProfile(); show('account');
-  setTimeout(() => (logged ? $('nameInput') : (pendingEmail ? $('codeInput') : $('emailInput'))).focus({ preventScroll: true }), 30);
+function setView(v){
+  VIEWS.forEach(id => $(id).hidden = id !== v);
+  $('authTabs').hidden = !(v === 'loginForm' || v === 'signupForm');
+  $('tabLogin').setAttribute('aria-selected', String(v === 'loginForm'));
+  $('tabSignup').setAttribute('aria-selected', String(v === 'signupForm'));
+  $('accTitle').textContent = TITLES[v];
+  accMsg('');
+  setTimeout(() => $(FIRST[v])?.focus({ preventScroll: true }), 30);
+}
+function openAccount(view){
+  if (state === 'play' || !sb) return;
+  if ($('account').hidden) returnTo = state === 'over' ? 'over' : 'menu';
+  show('account'); fillProfile();
+  setView(typeof view === 'string' ? view : recovering ? 'resetForm' : session ? 'profileView' : 'loginForm');
 }
 function closeAccount(){ show(returnTo); }
 $('accClose').onclick = closeAccount;
+$('tabLogin').onclick = () => setView('loginForm');
+$('tabSignup').onclick = () => setView('signupForm');
+$('forgotBtn').onclick = () => { const v = $('loginUser').value.trim(); setView('forgotForm'); if (v.includes('@')) $('fgEmail').value = v; };
+$('backLogin').onclick = () => setView('loginForm');
 
-$('emailForm').addEventListener('submit', async e => {
-  e.preventDefault();
-  const email = $('emailInput').value.trim(); if (!email) return;
-  $('emailBtn').disabled = true; accMsg('Enviando…');
-  const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname } });
-  $('emailBtn').disabled = false;
-  if (error){ accMsg(error.status === 429 ? 'Has pedido demasiados emails. Espera un minuto y vuelve a probar.' : 'No se pudo enviar el email. Revisa la dirección.', true); return; }
-  pendingEmail = email;
-  $('codeLede').textContent = `Te hemos enviado un email a ${email}. Pulsa el enlace en este dispositivo o escribe aquí el código.`;
-  $('emailForm').hidden = true; $('codeForm').hidden = false; accMsg('');
-  $('codeInput').focus();
+$('loginForm').addEventListener('submit', async e => {
+  e.preventDefault(); const f = e.currentTarget;
+  const id = $('loginUser').value.trim(), password = $('loginPass').value;
+  if (!id || !password) return;
+  busy(f, true); accMsg('Entrando…');
+  try {
+    if (id.includes('@')){
+      const { error } = await sb.auth.signInWithPassword({ email: id, password });
+      if (error) throw error;
+    } else {
+      const r = await fetch(LOGIN_FN, { method: 'POST', headers: { 'content-type': 'application/json', apikey: SUPABASE_ANON_JWT, authorization: 'Bearer ' + SUPABASE_ANON_JWT }, body: JSON.stringify({ username: id, password }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.access_token) throw { code: j.error || 'invalid_login', status: r.status };
+      const { error } = await sb.auth.setSession({ access_token: j.access_token, refresh_token: j.refresh_token });
+      if (error) throw error;
+    }
+    $('loginPass').value = ''; accMsg('');
+  } catch(err){
+    accMsg(err?.code === 'email_not_confirmed' ? 'Antes de entrar, confirma tu cuenta con el enlace que te enviamos por email.'
+      : err?.status === 429 ? 'Demasiados intentos. Espera un minuto y vuelve a probar.'
+      : 'Usuario o contraseña incorrectos.', true);
+  } finally { busy(f, false); }
 });
-$('codeForm').addEventListener('submit', async e => {
-  e.preventDefault();
-  const token = $('codeInput').value.trim(); if (!token) return;
-  accMsg('Comprobando…');
-  const { error } = await sb.auth.verifyOtp({ email: pendingEmail, token, type: 'email' });
-  if (error){ accMsg('Ese código no vale o ha caducado. Pide otro.', true); return; }
-  accMsg('');
+
+$('signupForm').addEventListener('submit', async e => {
+  e.preventDefault(); const f = e.currentTarget;
+  const username = $('suUser').value.trim(), email = $('suEmail').value.trim(), password = $('suPass').value;
+  if (!NAME_RE.test(username)){ accMsg('El nombre debe tener de 3 a 16 letras, números o _ (sin espacios).', true); return; }
+  if (password.length < 6){ accMsg('La contraseña necesita al menos 6 caracteres.', true); return; }
+  busy(f, true); accMsg('Creando tu cuenta…');
+  try {
+    const { data: free, error: e1 } = await sb.rpc('username_available', { p_name: username });
+    if (e1) throw e1;
+    if (!free){ accMsg('Ese nombre ya lo tiene otro piloto. Prueba otro.', true); return; }
+    const { data, error } = await sb.auth.signUp({ email, password, options: { data: { username }, emailRedirectTo: location.origin + location.pathname } });
+    if (error) throw error;
+    $('suPass').value = '';
+    if (!data.session){
+      setView('loginForm'); $('loginUser').value = username;
+      accMsg('Cuenta creada. Confirma tu email con el enlace que te hemos enviado y después entra.');
+    }
+  } catch(err){
+    const m = String(err?.message || '');
+    accMsg(err?.code === 'user_already_exists' || /already registered/i.test(m) ? 'Ya hay una cuenta con ese email. Entra o recupera la contraseña.'
+      : err?.code === 'weak_password' ? 'Esa contraseña es demasiado débil. Prueba con otra más larga.'
+      : err?.status === 429 ? 'Demasiados intentos. Espera un poco y vuelve a probar.'
+      : 'No se pudo crear la cuenta. Inténtalo de nuevo.', true);
+  } finally { busy(f, false); }
 });
-$('otherEmail').onclick = () => { pendingEmail = ''; $('codeForm').hidden = true; $('emailForm').hidden = false; accMsg(''); $('emailInput').focus(); };
+
+$('forgotForm').addEventListener('submit', async e => {
+  e.preventDefault(); const f = e.currentTarget;
+  const email = $('fgEmail').value.trim(); if (!email) return;
+  busy(f, true); accMsg('Enviando…');
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
+  busy(f, false);
+  if (error){ accMsg(error.status === 429 ? 'Has pedido demasiados emails. Espera un rato y vuelve a probar.' : 'No se pudo enviar el email. Revisa la dirección.', true); return; }
+  accMsg('Si ese email tiene una cuenta, te llegará un enlace en unos minutos. Ábrelo en este dispositivo.');
+});
+
+$('resetForm').addEventListener('submit', async e => {
+  e.preventDefault(); const f = e.currentTarget;
+  const password = $('newPass').value;
+  if (password.length < 6){ accMsg('La contraseña necesita al menos 6 caracteres.', true); return; }
+  busy(f, true);
+  const { error } = await sb.auth.updateUser({ password });
+  busy(f, false);
+  if (error){ accMsg(error.code === 'same_password' ? 'Usa una contraseña distinta a la anterior.' : 'No se pudo guardar. Pide otro enlace de recuperación.', true); return; }
+  recovering = false; $('newPass').value = '';
+  setView('profileView'); accMsg('Contraseña cambiada.');
+});
 
 $('nameForm').addEventListener('submit', async e => {
   e.preventDefault();
   const name = $('nameInput').value.trim();
-  if (!/^[A-Za-z0-9_áéíóúñÁÉÍÓÚÑ]{3,16}$/.test(name)){ accMsg('Usa de 3 a 16 letras, números o _ (sin espacios).', true); return; }
+  if (!NAME_RE.test(name)){ accMsg('Usa de 3 a 16 letras, números o _ (sin espacios).', true); return; }
   const { data, error } = await sb.rpc('set_username', { p_name: name });
   if (error){ accMsg(/name_taken/.test(error.message) ? 'Ese nombre ya lo tiene otro piloto. Prueba otro.' : 'No se pudo guardar el nombre.', true); return; }
   profile = data; accMsg('Nombre guardado.'); renderAccount(); loadBoard();
 });
-$('logoutBtn').onclick = async () => { await sb.auth.signOut(); accMsg(''); closeAccount(); };
+$('logoutBtn').onclick = async () => { await sb.auth.signOut(); closeAccount(); };
 
 if (sb){
   sb.auth.onAuthStateChange((event, sess) => {
     const wasIn = !!session; session = sess;
     setTimeout(async () => {  // fuera del callback, como recomienda Supabase
       await loadProfile();
+      if (event === 'PASSWORD_RECOVERY'){ recovering = true; if (state !== 'play') openAccount('resetForm'); return; }
       if (session && !wasIn){
-        pendingEmail = '';
         await flushPending();
         loadBoard();
-        if (!$('account').hidden) openAccount();
-        if (event === 'SIGNED_IN' && profile && /^piloto[0-9a-f]{6}$/.test(profile.username)) { openAccount(); accMsg('¡Dentro! Elige tu nombre para el ranking.'); }
+        if (!$('account').hidden && !recovering) openAccount('profileView');
       }
-      if (!session && wasIn){ profile = null; renderAccount(); loadBoard(); }
+      if (!session && wasIn){ profile = null; recovering = false; renderAccount(); loadBoard(); }
     }, 0);
   });
   loadBoard();
