@@ -38,10 +38,10 @@ body{background:var(--void);color:var(--ink);font-family:var(--body);overflow:hi
 .hud .pause{pointer-events:auto;background:none;border:1px solid #ffffff33;color:var(--ink);border-radius:8px;
   width:38px;height:38px;font:700 16px var(--body);cursor:pointer}
 canvas{display:block;flex:1;width:100%;min-height:0;touch-action:none;cursor:crosshair}
-.overlay{position:absolute;inset:0;z-index:3;display:grid;place-items:center;
+.overlay{position:absolute;inset:0;z-index:3;display:flex;overflow-y:auto;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
   background:radial-gradient(ellipse at center,#0a1328cc,#0a1328f2)}
-.panel{width:min(400px,100%);text-align:center;display:flex;flex-direction:column;gap:14px;align-items:center}
+.panel{width:min(400px,100%);margin:auto;padding-block:24px;text-align:center;display:flex;flex-direction:column;gap:14px;align-items:center}
 h1{font-family:var(--display);font-weight:400;font-size:clamp(34px,10vw,52px);line-height:.95;margin:0;text-wrap:balance;
   background:linear-gradient(180deg,var(--ink) 40%,var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}
 h2{font-family:var(--display);font-weight:400;font-size:30px;margin:0;color:var(--signal)}
@@ -64,6 +64,28 @@ h2{font-family:var(--display);font-weight:400;font-size:30px;margin:0;color:var(
 .donate a{background:var(--gold);color:#2a1c00;text-decoration:none;font:700 14px var(--body);padding:10px 18px;border-radius:10px}
 .toast{position:absolute;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:5;
   background:var(--ink);color:var(--void);font-weight:700;padding:8px 14px;border-radius:8px;font-size:14px}
+.account{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;font-size:13px;color:var(--ink-dim)}
+.account strong{color:var(--ink);font-weight:700}
+.link{background:none;border:0;padding:0;color:var(--gold);font:700 13px var(--body);cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.link:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.board{width:100%;text-align:left;border:1px solid #ffffff1f;border-radius:12px;padding:12px 14px;background:#0f1c3d99}
+.board h3{margin:0 0 8px;font:700 11px var(--body);letter-spacing:.16em;text-transform:uppercase;color:var(--ink-dim);display:flex;justify-content:space-between}
+.board ol{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px;font-variant-numeric:tabular-nums}
+.board li{display:grid;grid-template-columns:2ch 1fr auto;gap:10px;font-size:14px;align-items:baseline}
+.board li span:first-child{color:var(--ink-dim);text-align:right}
+.board li span:nth-child(2){overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.board li.me{color:var(--gold);font-weight:700}
+.board .empty{font-size:13px;color:var(--ink-dim);margin:0}
+.save{font-size:13px;color:var(--ink-dim);margin:0;max-width:34ch}
+form.stack{display:flex;flex-direction:column;gap:10px;width:100%}
+.field{display:flex;flex-direction:column;gap:6px;text-align:left;font-size:13px;color:var(--ink-dim)}
+.field input{font:600 16px var(--body);color:var(--ink);background:#0f1c3d;border:1px solid #ffffff33;border-radius:10px;padding:12px 14px;width:100%}
+.field input:focus{outline:2px solid var(--gold);outline-offset:1px;border-color:transparent}
+.msg{font-size:13px;margin:0;min-height:1.2em;color:var(--ink-dim)}
+.msg.err{color:var(--signal)}
+.kv{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%}
+.kv .stat{align-items:center}
+.kv .stat b{font-size:20px}
 @media (prefers-reduced-motion:reduce){.record{animation:none}}
 </style>
 </head>
@@ -89,6 +111,8 @@ h2{font-family:var(--display);font-weight:400;font-size:30px;margin:0;color:var(
       </div>
       <button class="btn" id="playBtn">Jugar</button>
       <p class="hint">Ratón o dedo para mover · Flechas o WASD · P para pausa</p>
+      <div class="account" data-account></div>
+      <div class="board" data-board hidden></div>
     </div>
   </div>
 
@@ -109,22 +133,66 @@ h2{font-family:var(--display);font-weight:400;font-size:30px;margin:0;color:var(
       </div>
       <p class="hint" id="oBest"></p>
       <button class="btn" id="againBtn">Otra vez</button>
+      <p class="save" id="saveMsg"></p>
       <div class="row">
         <button class="ghost" id="shareBtn">Compartir resultado</button>
       </div>
+      <div class="board" data-board hidden></div>
       <div class="donate">
         <p>Este juego es gratis. Si te ha alegrado el rato, puedes apoyarlo.</p>
         <a id="donateLink" href="https://ko-fi.com/" target="_blank" rel="noopener">Invítame a un café ☕</a>
       </div>
     </div>
   </div>
+  <div class="overlay" id="account" hidden>
+    <div class="panel">
+      <div id="loginView" class="panel" style="padding:0">
+        <h2>Tu cuenta</h2>
+        <p class="lede">Guarda tu récord en la nube, juega en el PC o en el móvil y entra en el ranking mundial. Sin contraseñas.</p>
+        <form class="stack" id="emailForm">
+          <label class="field" for="emailInput">Tu email
+            <input id="emailInput" type="email" autocomplete="email" required placeholder="tu@email.com">
+          </label>
+          <button class="btn" type="submit" id="emailBtn">Enviarme el acceso</button>
+        </form>
+        <form class="stack" id="codeForm" hidden>
+          <p class="lede" id="codeLede"></p>
+          <label class="field" for="codeInput">Código del email (si lo trae)
+            <input id="codeInput" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="123456">
+          </label>
+          <button class="btn" type="submit">Entrar con el código</button>
+          <button class="link" type="button" id="otherEmail">Usar otro email</button>
+        </form>
+      </div>
+      <div id="profileView" class="panel" style="padding:0" hidden>
+        <h2>Piloto</h2>
+        <div class="kv">
+          <div class="stat"><b id="pBest">0</b><span>Récord</span></div>
+          <div class="stat"><b id="pCoins">0</b><span>Monedas</span></div>
+          <div class="stat"><b id="pGames">0</b><span>Partidas</span></div>
+        </div>
+        <form class="stack" id="nameForm">
+          <label class="field" for="nameInput">Nombre en el ranking (3 a 16 letras, números o _)
+            <input id="nameInput" maxlength="16" autocomplete="nickname">
+          </label>
+          <button class="ghost" type="submit">Guardar nombre</button>
+        </form>
+        <button class="link" type="button" id="logoutBtn">Cerrar sesión</button>
+      </div>
+      <p class="msg" id="accMsg" role="status"></p>
+      <button class="ghost" type="button" id="accClose">Volver</button>
+    </div>
+  </div>
   <div class="toast" id="toast" hidden></div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js"></script>
 <script>
 (() => {
 // ====== CONFIGURACIÓN ======
 const DONATE_URL = "https://ko-fi.com/"; // ← cambia esto por tu página de Ko-fi / Buy Me a Coffee
+const SUPABASE_URL = "https://wbsruxvsgygtlvfowjuu.supabase.co";
+const SUPABASE_KEY = "sb_publishable_W9W1qSOWdGTDZR8Qwxju9A_ncUiKR8i"; // clave pública: puede ir en la web
 document.getElementById('donateLink').href = DONATE_URL;
 
 const cvs = document.getElementById('game'), ctx = cvs.getContext('2d');
@@ -175,6 +243,8 @@ cvs.addEventListener('pointermove', e => {
 cvs.addEventListener('pointerdown', e => { cvs.dispatchEvent(new PointerEvent('pointermove', e)); });
 cvs.addEventListener('pointerleave', () => { pointer = null; });
 addEventListener('keydown', e => {
+  if (e.target.closest && e.target.closest('input, textarea')) { if (e.key === 'Escape' && !$('account').hidden) closeAccount(); return; }
+  if (!$('account').hidden) return;
   keys[e.key.toLowerCase()] = true;
   if ([' ','arrowup','arrowdown','arrowleft','arrowright'].includes(e.key.toLowerCase())) e.preventDefault();
   if ((e.key === ' ' || e.key === 'Enter') && state !== 'play' && state !== 'dying') start();
@@ -184,20 +254,20 @@ addEventListener('keydown', e => {
 addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 
 // ====== Pantallas ======
-function show(id){ ['menu','paused','over'].forEach(o => $(o).hidden = o !== id); }
+function show(id){ ['menu','paused','over','account'].forEach(o => $(o).hidden = o !== id); }
 function start(){ reset(); state = 'play'; show(null); last = performance.now(); }
 function togglePause(){
   if (state === 'play'){ state = 'pause'; show('paused'); }
   else if (state === 'pause'){ state = 'play'; show(null); last = performance.now(); }
 }
 $('playBtn').onclick = start; $('againBtn').onclick = start;
-$('resumeBtn').onclick = togglePause; $('pauseBtn').onclick = togglePause;
+$('resumeBtn').onclick = togglePause; $('pauseBtn').onclick = e => { e.currentTarget.blur(); togglePause(); };
 document.addEventListener('visibilitychange', () => { if (document.hidden && state === 'play') togglePause(); });
 
 function toast(msg){ const el = $('toast'); el.textContent = msg; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => el.hidden = true, 1800); }
 
 $('shareBtn').onclick = () => {
-  const txt = `🚀 He aguantado ${t.toFixed(1).replace('.',',')} s y hecho ${Math.floor(score).toLocaleString('es-ES')} puntos en Rocafall. ¿Me superas?`;
+  const txt = `🚀 He aguantado ${t.toFixed(1).replace('.',',')} s y hecho ${Math.floor(score).toLocaleString('es-ES')} puntos en Rocafall. ¿Me superas? ${location.origin}${location.pathname}`;
   navigator.clipboard?.writeText(txt).then(() => toast('Copiado. ¡Pégalo donde quieras!'), () => toast(txt)) ?? toast(txt);
 };
 
@@ -349,6 +419,7 @@ function gameOver(){
   $('newRecord').hidden = !isRecord;
   $('oBest').textContent = isRecord ? 'Lo has superado. ¿Puedes más?' : `Tu récord: ${best.toLocaleString('es-ES')} · te faltan ${(best - s).toLocaleString('es-ES')} puntos`;
   updateHud(); show('over');
+  onRunFinished(s, +t.toFixed(1), coins);
   setTimeout(() => $('againBtn').focus({ preventScroll: true }), 50);
 }
 
@@ -447,6 +518,170 @@ function draw(){
 
   ctx.restore();
 }
+
+// ====== Cuentas, récord en la nube y ranking ======
+let sb = null, session = null, profile = null, returnTo = 'menu', pendingEmail = '';
+try { sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY); } catch(e){ sb = null; }
+const fmt = n => Math.floor(n).toLocaleString('es-ES');
+
+function renderAccount(){
+  document.querySelectorAll('[data-account]').forEach(el => {
+    el.replaceChildren();
+    if (!sb){ return; }
+    const b = document.createElement('button'); b.className = 'link'; b.type = 'button';
+    if (session && profile){
+      const s = document.createElement('span'); s.append('Piloto: ');
+      const n = document.createElement('strong'); n.textContent = profile.username; s.append(n);
+      b.textContent = 'Mi cuenta'; el.append(s, b);
+    } else {
+      const s = document.createElement('span'); s.textContent = 'Tu récord se guarda solo en este dispositivo.';
+      b.textContent = 'Crear cuenta o entrar'; el.append(s, b);
+    }
+    b.onclick = openAccount;
+  });
+}
+
+async function loadProfile(){
+  if (!sb || !session){ profile = null; renderAccount(); return; }
+  const { data } = await sb.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
+  profile = data || null;
+  if (profile && profile.best_score > best){ best = profile.best_score; saveBest(); }
+  updateHud(); renderAccount(); fillProfile();
+}
+
+async function loadBoard(){
+  if (!sb) return;
+  const { data, error } = await sb.from('profiles').select('id,username,best_score').gt('best_score', 0)
+    .order('best_score', { ascending: false }).limit(10);
+  if (error) return;
+  let myRank = null;
+  if (profile && profile.best_score > 0 && !data.some(r => r.id === profile.id)){
+    const { count } = await sb.from('profiles').select('id', { count: 'exact', head: true }).gt('best_score', profile.best_score);
+    if (count != null) myRank = count + 1;
+  }
+  document.querySelectorAll('[data-board]').forEach(el => {
+    el.replaceChildren();
+    const h = document.createElement('h3'); h.innerHTML = '<span>Ranking mundial</span><span>Puntos</span>';
+    el.append(h);
+    if (!data.length){
+      const p = document.createElement('p'); p.className = 'empty'; p.textContent = 'Todavía no hay récords. El primero se queda arriba.';
+      el.append(p);
+    } else {
+      const ol = document.createElement('ol');
+      const row = (pos, name, pts, me) => {
+        const li = document.createElement('li'); if (me) li.className = 'me';
+        [pos, name, fmt(pts)].forEach(v => { const sp = document.createElement('span'); sp.textContent = v; li.append(sp); });
+        ol.append(li);
+      };
+      data.forEach((r, i) => row(i + 1, r.username, r.best_score, profile && r.id === profile.id));
+      if (myRank) row(myRank, profile.username + ' (tú)', profile.best_score, true);
+      el.append(ol);
+    }
+    el.hidden = false;
+  });
+}
+
+async function submitRun(run){
+  const { data, error } = await sb.rpc('submit_run', { p_score: run.score, p_seconds: run.seconds, p_coins: run.coins });
+  if (error) throw error;
+  profile = data; if (profile.best_score > best){ best = profile.best_score; saveBest(); }
+  updateHud(); renderAccount(); fillProfile();
+}
+
+async function onRunFinished(s, secs, c){
+  const msg = $('saveMsg'); msg.textContent = '';
+  if (!sb) return;
+  const run = { score: s, seconds: secs, coins: c };
+  if (session){
+    msg.textContent = 'Guardando en tu cuenta…';
+    try { await submitRun(run); msg.textContent = 'Partida guardada en tu cuenta.'; }
+    catch(e){ msg.textContent = 'No se pudo guardar esta partida. Revisa tu conexión.'; }
+  } else {
+    try { localStorage.setItem('rocafall-pending', JSON.stringify(run)); } catch(e){}
+    msg.replaceChildren('¿Quieres entrar en el ranking? ');
+    const b = document.createElement('button'); b.className = 'link'; b.type = 'button';
+    b.textContent = 'Crea una cuenta y guardamos esta partida'; b.onclick = openAccount; msg.append(b);
+  }
+  loadBoard();
+}
+
+async function flushPending(){
+  let run = null;
+  try { run = JSON.parse(localStorage.getItem('rocafall-pending') || 'null'); localStorage.removeItem('rocafall-pending'); } catch(e){}
+  if (run && session){ try { await submitRun(run); toast('Tu última partida ya está en el ranking'); } catch(e){} }
+}
+
+// --- pantalla de cuenta ---
+function accMsg(text, err){ const m = $('accMsg'); m.textContent = text; m.className = 'msg' + (err ? ' err' : ''); }
+function fillProfile(){
+  if (!profile) return;
+  $('pBest').textContent = fmt(profile.best_score);
+  $('pCoins').textContent = fmt(profile.total_coins);
+  $('pGames').textContent = fmt(profile.games);
+  if (document.activeElement !== $('nameInput')) $('nameInput').value = profile.username;
+}
+function openAccount(){
+  if (state === 'play') return;
+  returnTo = state === 'over' ? 'over' : 'menu';
+  const logged = !!session;
+  $('loginView').hidden = logged; $('profileView').hidden = !logged;
+  $('emailForm').hidden = !!pendingEmail; $('codeForm').hidden = !pendingEmail;
+  accMsg(''); fillProfile(); show('account');
+  setTimeout(() => (logged ? $('nameInput') : (pendingEmail ? $('codeInput') : $('emailInput'))).focus({ preventScroll: true }), 30);
+}
+function closeAccount(){ show(returnTo); }
+$('accClose').onclick = closeAccount;
+
+$('emailForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const email = $('emailInput').value.trim(); if (!email) return;
+  $('emailBtn').disabled = true; accMsg('Enviando…');
+  const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname } });
+  $('emailBtn').disabled = false;
+  if (error){ accMsg(error.status === 429 ? 'Has pedido demasiados emails. Espera un minuto y vuelve a probar.' : 'No se pudo enviar el email. Revisa la dirección.', true); return; }
+  pendingEmail = email;
+  $('codeLede').textContent = `Te hemos enviado un email a ${email}. Pulsa el enlace en este dispositivo o escribe aquí el código.`;
+  $('emailForm').hidden = true; $('codeForm').hidden = false; accMsg('');
+  $('codeInput').focus();
+});
+$('codeForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const token = $('codeInput').value.trim(); if (!token) return;
+  accMsg('Comprobando…');
+  const { error } = await sb.auth.verifyOtp({ email: pendingEmail, token, type: 'email' });
+  if (error){ accMsg('Ese código no vale o ha caducado. Pide otro.', true); return; }
+  accMsg('');
+});
+$('otherEmail').onclick = () => { pendingEmail = ''; $('codeForm').hidden = true; $('emailForm').hidden = false; accMsg(''); $('emailInput').focus(); };
+
+$('nameForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const name = $('nameInput').value.trim();
+  if (!/^[A-Za-z0-9_áéíóúñÁÉÍÓÚÑ]{3,16}$/.test(name)){ accMsg('Usa de 3 a 16 letras, números o _ (sin espacios).', true); return; }
+  const { data, error } = await sb.rpc('set_username', { p_name: name });
+  if (error){ accMsg(/name_taken/.test(error.message) ? 'Ese nombre ya lo tiene otro piloto. Prueba otro.' : 'No se pudo guardar el nombre.', true); return; }
+  profile = data; accMsg('Nombre guardado.'); renderAccount(); loadBoard();
+});
+$('logoutBtn').onclick = async () => { await sb.auth.signOut(); accMsg(''); closeAccount(); };
+
+if (sb){
+  sb.auth.onAuthStateChange((event, sess) => {
+    const wasIn = !!session; session = sess;
+    setTimeout(async () => {  // fuera del callback, como recomienda Supabase
+      await loadProfile();
+      if (session && !wasIn){
+        pendingEmail = '';
+        await flushPending();
+        loadBoard();
+        if (!$('account').hidden) openAccount();
+        if (event === 'SIGNED_IN' && profile && /^piloto[0-9a-f]{6}$/.test(profile.username)) { openAccount(); accMsg('¡Dentro! Elige tu nombre para el ranking.'); }
+      }
+      if (!session && wasIn){ profile = null; renderAccount(); loadBoard(); }
+    }, 0);
+  });
+  loadBoard();
+}
+renderAccount();
 
 // ====== Arranque ======
 function boot(){
