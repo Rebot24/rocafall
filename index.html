@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Esquiva asteroides, recoge monedas y aguanta lo máximo posible. Gratis en el navegador.">
+<title>Rocafall</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Chakra+Petch:wght@400;600;700&display=swap">
+<style>
+/* Layout: one full-height arcade screen. HUD strip on top, play field below, overlays for menu / game over. Single dark "deep space" world by choice. */
+:root{
+  --void:#0a1328;        /* espacio profundo, azul tinta */
+  --void-2:#14234a;
+  --hull:#bfe9ff;        /* nave */
+  --thrust:#ff7a59;      /* llama del motor */
+  --gold:#ffc83d;        /* monedas */
+  --rock:#8d7f74;        /* asteroides */
+  --signal:#ff5d8f;      /* acento UI */
+  --ink:#eef3ff;
+  --ink-dim:#93a3c8;
+  --display:"Bungee","Impact","Arial Black",sans-serif;
+  --body:"Chakra Petch","Trebuchet MS",system-ui,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:var(--void);color:var(--ink);font-family:var(--body);overflow:hidden;
+  padding-left:max(0px,env(safe-area-inset-left,0px));padding-right:max(0px,env(safe-area-inset-right,0px))}
+.app{position:relative;height:100%;display:flex;flex-direction:column}
+.hud{display:flex;justify-content:space-between;align-items:center;gap:12px;
+  padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  background:linear-gradient(var(--void-2),transparent);position:absolute;inset:0 0 auto;z-index:2;pointer-events:none}
+.stat{display:flex;flex-direction:column;line-height:1.1}
+.stat b{font-family:var(--display);font-size:22px;font-weight:400;font-variant-numeric:tabular-nums}
+.stat span{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-dim)}
+.stat.coins b{color:var(--gold)}
+.stat.right{align-items:flex-end}
+.hud .pause{pointer-events:auto;background:none;border:1px solid #ffffff33;color:var(--ink);border-radius:8px;
+  width:38px;height:38px;font:700 16px var(--body);cursor:pointer}
+canvas{display:block;flex:1;width:100%;min-height:0;touch-action:none;cursor:crosshair}
+.overlay{position:absolute;inset:0;z-index:3;display:grid;place-items:center;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  background:radial-gradient(ellipse at center,#0a1328cc,#0a1328f2)}
+.panel{width:min(400px,100%);text-align:center;display:flex;flex-direction:column;gap:14px;align-items:center}
+h1{font-family:var(--display);font-weight:400;font-size:clamp(34px,10vw,52px);line-height:.95;margin:0;text-wrap:balance;
+  background:linear-gradient(180deg,var(--ink) 40%,var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}
+h2{font-family:var(--display);font-weight:400;font-size:30px;margin:0;color:var(--signal)}
+.lede{margin:0;color:var(--ink-dim);font-size:15px;line-height:1.5;max-width:34ch}
+.legend{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;font-size:13px;text-align:left;color:var(--ink-dim);margin:4px 0}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:8px;vertical-align:-1px}
+.btn{font:700 17px var(--body);letter-spacing:.06em;text-transform:uppercase;border:0;border-radius:12px;padding:14px 28px;cursor:pointer;
+  background:var(--signal);color:#1a0610;box-shadow:0 4px 0 #a8325a;transition:transform .08s}
+.btn:active{transform:translateY(3px);box-shadow:0 1px 0 #a8325a}
+.btn:focus-visible,.ghost:focus-visible,.pause:focus-visible,.donate:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
+.row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.ghost{font:600 14px var(--body);background:none;border:1px solid #ffffff40;color:var(--ink);border-radius:10px;padding:10px 16px;cursor:pointer;text-decoration:none}
+.hint{font-size:12px;color:var(--ink-dim);margin:0}
+.big{display:flex;gap:28px;justify-content:center}
+.big .stat b{font-size:34px}
+.record{font-family:var(--display);color:var(--gold);font-size:16px;letter-spacing:.04em;animation:pulse 1s ease-in-out infinite alternate}
+@keyframes pulse{from{transform:scale(1)}to{transform:scale(1.08)}}
+.donate{display:flex;flex-direction:column;gap:8px;align-items:center;border-top:1px dashed #ffffff26;padding-top:14px;margin-top:4px;width:100%}
+.donate p{margin:0;font-size:13px;color:var(--ink-dim);max-width:32ch}
+.donate a{background:var(--gold);color:#2a1c00;text-decoration:none;font:700 14px var(--body);padding:10px 18px;border-radius:10px}
+.toast{position:absolute;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:5;
+  background:var(--ink);color:var(--void);font-weight:700;padding:8px 14px;border-radius:8px;font-size:14px}
+@media (prefers-reduced-motion:reduce){.record{animation:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="hud">
+    <div class="stat"><b id="hScore">0</b><span>Puntos</span></div>
+    <div class="stat coins"><b id="hCoins">0</b><span>Monedas</span></div>
+    <div class="stat right"><b id="hBest">0</b><span>Récord</span></div>
+    <button class="pause" id="pauseBtn" aria-label="Pausa">II</button>
+  </div>
+  <canvas id="game" aria-label="Campo de juego"></canvas>
+
+  <div class="overlay" id="menu">
+    <div class="panel">
+      <h1>Rocafall</h1>
+      <p class="lede">Esquiva las rocas, recoge monedas y aguanta todo lo que puedas. Cada segundo es más difícil.</p>
+      <div class="legend">
+        <div><i style="background:var(--rock)"></i>Asteroide: evítalo</div>
+        <div><i style="background:var(--gold)"></i>Moneda: encadénalas</div>
+        <div><i style="background:#5ee6ff"></i>Escudo: aguanta un golpe</div>
+        <div><i style="background:#c38bff"></i>Imán: atrae monedas</div>
+      </div>
+      <button class="btn" id="playBtn">Jugar</button>
+      <p class="hint">Ratón o dedo para mover · Flechas o WASD · P para pausa</p>
+    </div>
+  </div>
+
+  <div class="overlay" id="paused" hidden>
+    <div class="panel">
+      <h2>Pausa</h2>
+      <button class="btn" id="resumeBtn">Seguir</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="over" hidden>
+    <div class="panel">
+      <h2>¡Impacto!</h2>
+      <div class="record" id="newRecord" hidden>¡Nuevo récord!</div>
+      <div class="big">
+        <div class="stat"><b id="oScore">0</b><span>Puntos</span></div>
+        <div class="stat"><b id="oTime">0</b><span>Segundos</span></div>
+      </div>
+      <p class="hint" id="oBest"></p>
+      <button class="btn" id="againBtn">Otra vez</button>
+      <div class="row">
+        <button class="ghost" id="shareBtn">Compartir resultado</button>
+      </div>
+      <div class="donate">
+        <p>Este juego es gratis. Si te ha alegrado el rato, puedes apoyarlo.</p>
+        <a id="donateLink" href="https://ko-fi.com/" target="_blank" rel="noopener">Invítame a un café ☕</a>
+      </div>
+    </div>
+  </div>
+  <div class="toast" id="toast" hidden></div>
+</div>
+
+<script>
+(() => {
+// ====== CONFIGURACIÓN ======
+const DONATE_URL = "https://ko-fi.com/"; // ← cambia esto por tu página de Ko-fi / Buy Me a Coffee
+document.getElementById('donateLink').href = DONATE_URL;
+
+const cvs = document.getElementById('game'), ctx = cvs.getContext('2d');
+const $ = id => document.getElementById(id);
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let W = 0, H = 0;
+
+function resize(){
+  const r = cvs.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1);
+  W = r.width; H = r.height;
+  cvs.width = Math.round(W*dpr); cvs.height = Math.round(H*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  if (ship) { ship.x = Math.min(ship.x, W-20); ship.y = Math.min(ship.y, H-30); }
+}
+addEventListener('resize', resize);
+
+// ====== Récord ======
+let best = 0;
+try { best = +localStorage.getItem('lluvia-best') || 0; } catch(e){}
+const saveBest = () => { try { localStorage.setItem('lluvia-best', best); } catch(e){} };
+
+// ====== Estado ======
+let state = 'menu', t = 0, score = 0, coins = 0, combo = 0, comboTimer = 0;
+let ship, rocks, golds, powers, parts, texts, stars;
+let spawnRock = 0, spawnCoin = 0, spawnPower = 0, shake = 0, deadTimer = 0;
+const keys = {}; let pointer = null;
+
+function rand(a,b){ return a + Math.random()*(b-a); }
+
+function makeStars(){
+  stars = [];
+  for (let i=0;i<120;i++) stars.push({x:Math.random(), y:Math.random(), z:rand(.2,1)});
+}
+
+function reset(){
+  t = 0; score = 0; coins = 0; combo = 0; comboTimer = 0;
+  ship = { x: W/2, y: H*0.8, r: 14, shield: false, magnet: 0, tilt: 0 };
+  rocks = []; golds = []; powers = []; parts = []; texts = [];
+  spawnRock = .6; spawnCoin = 1; spawnPower = rand(10,16); shake = 0; deadTimer = 0;
+}
+
+// ====== Entrada ======
+cvs.addEventListener('pointermove', e => {
+  const r = cvs.getBoundingClientRect();
+  const lift = e.pointerType === 'touch' ? 60 : 0; // en móvil la nave va por encima del dedo
+  pointer = { x: e.clientX - r.left, y: e.clientY - r.top - lift };
+});
+cvs.addEventListener('pointerdown', e => { cvs.dispatchEvent(new PointerEvent('pointermove', e)); });
+cvs.addEventListener('pointerleave', () => { pointer = null; });
+addEventListener('keydown', e => {
+  keys[e.key.toLowerCase()] = true;
+  if ([' ','arrowup','arrowdown','arrowleft','arrowright'].includes(e.key.toLowerCase())) e.preventDefault();
+  if ((e.key === ' ' || e.key === 'Enter') && state !== 'play' && state !== 'dying') start();
+  if (e.key.toLowerCase() === 'p' || e.key === 'Escape') togglePause();
+  pointer = null;
+});
+addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+// ====== Pantallas ======
+function show(id){ ['menu','paused','over'].forEach(o => $(o).hidden = o !== id); }
+function start(){ reset(); state = 'play'; show(null); last = performance.now(); }
+function togglePause(){
+  if (state === 'play'){ state = 'pause'; show('paused'); }
+  else if (state === 'pause'){ state = 'play'; show(null); last = performance.now(); }
+}
+$('playBtn').onclick = start; $('againBtn').onclick = start;
+$('resumeBtn').onclick = togglePause; $('pauseBtn').onclick = togglePause;
+document.addEventListener('visibilitychange', () => { if (document.hidden && state === 'play') togglePause(); });
+
+function toast(msg){ const el = $('toast'); el.textContent = msg; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => el.hidden = true, 1800); }
+
+$('shareBtn').onclick = () => {
+  const txt = `🚀 He aguantado ${t.toFixed(1).replace('.',',')} s y hecho ${Math.floor(score).toLocaleString('es-ES')} puntos en Rocafall. ¿Me superas?`;
+  navigator.clipboard?.writeText(txt).then(() => toast('Copiado. ¡Pégalo donde quieras!'), () => toast(txt)) ?? toast(txt);
+};
+
+// ====== Spawns ======
+function addRock(){
+  const size = rand(12, 16 + Math.min(26, t*0.5));
+  const verts = []; const n = 8 + (Math.random()*4|0);
+  for (let i=0;i<n;i++) verts.push(rand(.72,1.08));
+  rocks.push({ x: rand(size, W-size), y: -size-10, r: size,
+    vy: rand(110,190) + t*4.2 - size*.8, vx: rand(-30,30) * Math.min(1, t/25),
+    rot: Math.random()*6, vr: rand(-2,2), verts, near: false });
+}
+function addCoins(){
+  if (Math.random() < .35){ // fila de monedas: recompensa por arriesgar
+    const x0 = rand(40, W-40), n = 4 + (Math.random()*3|0), dx = rand(-22,22);
+    for (let i=0;i<n;i++) golds.push({ x: Math.max(14, Math.min(W-14, x0 + dx*i)), y: -20 - i*34, r: 9, vy: 150 + t*2, ph: i*.6 });
+  } else golds.push({ x: rand(20, W-20), y: -20, r: 9, vy: 140 + t*2, ph: Math.random()*6 });
+}
+function addPower(){
+  powers.push({ x: rand(30, W-30), y: -20, r: 13, vy: 130, kind: Math.random() < .5 ? 'shield' : 'magnet', ph: 0 });
+}
+function burst(x,y,color,n,sp=220){
+  for (let i=0;i<n;i++){ const a = Math.random()*Math.PI*2, s = rand(.2,1)*sp;
+    parts.push({ x, y, vx: Math.cos(a)*s, vy: Math.sin(a)*s, life: rand(.4,.9), max: .9, color, size: rand(1.5,3.5) }); }
+}
+function float(x,y,txt,color){ texts.push({ x, y, txt, color, life: 1 }); }
+
+// ====== Bucle ======
+let last = performance.now();
+function loop(now){
+  const dt = Math.min(.033, (now - last)/1000); last = now;
+  if (state === 'play' || state === 'dying') update(dt);
+  else if (state === 'menu' || state === 'over') idle(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+
+function idle(dt){
+  for (const s of stars){ s.y += dt * .04 * s.z; if (s.y > 1) { s.y = 0; s.x = Math.random(); } }
+  if (state === 'over') stepParts(dt);
+}
+
+function stepParts(dt){
+  for (const p of parts){ p.x += p.vx*dt; p.y += p.vy*dt; p.vx *= .97; p.vy *= .97; p.life -= dt; }
+  parts = parts.filter(p => p.life > 0);
+  for (const f of texts){ f.y -= 40*dt; f.life -= dt*1.1; }
+  texts = texts.filter(f => f.life > 0);
+}
+
+function update(dt){
+  const speedK = 1 + t*0.02;
+  for (const s of stars){ s.y += dt * .12 * s.z * speedK; if (s.y > 1) { s.y = 0; s.x = Math.random(); } }
+  stepParts(dt);
+  if (shake > 0) shake = Math.max(0, shake - dt*30);
+
+  if (state === 'dying'){
+    deadTimer -= dt;
+    for (const r of rocks){ r.y += r.vy*dt*.3; r.rot += r.vr*dt; }
+    if (deadTimer <= 0) gameOver();
+    return;
+  }
+
+  t += dt;
+  score += dt * 10;
+
+  // Movimiento de la nave
+  const prevX = ship.x;
+  let kx = (keys['arrowright']||keys['d']?1:0) - (keys['arrowleft']||keys['a']?1:0);
+  let ky = (keys['arrowdown']||keys['s']?1:0) - (keys['arrowup']||keys['w']?1:0);
+  if (kx || ky){ ship.x += kx*360*dt; ship.y += ky*300*dt; }
+  else if (pointer){ ship.x += (pointer.x - ship.x) * Math.min(1, dt*14); ship.y += (pointer.y - ship.y) * Math.min(1, dt*14); }
+  ship.x = Math.max(ship.r, Math.min(W - ship.r, ship.x));
+  ship.y = Math.max(H*0.25, Math.min(H - ship.r - 8, ship.y));
+  ship.tilt += (((ship.x - prevX) / Math.max(dt,.001)) / 900 - ship.tilt) * Math.min(1, dt*10);
+  if (ship.magnet > 0) ship.magnet -= dt;
+  if (comboTimer > 0){ comboTimer -= dt; if (comboTimer <= 0) combo = 0; }
+
+  // Motor
+  if (Math.random() < .8) parts.push({ x: ship.x + rand(-3,3), y: ship.y + 16, vx: rand(-20,20), vy: rand(120,200), life: .3, max: .3, color: Math.random()<.5?'#ff7a59':'#ffc83d', size: rand(1.5,3) });
+
+  // Spawns con dificultad creciente
+  spawnRock -= dt;
+  if (spawnRock <= 0){ addRock(); spawnRock = Math.max(.16, .85 - t*.013) * rand(.6,1.3); }
+  spawnCoin -= dt;
+  if (spawnCoin <= 0){ addCoins(); spawnCoin = rand(.9,1.8); }
+  spawnPower -= dt;
+  if (spawnPower <= 0){ addPower(); spawnPower = rand(12,20); }
+
+  // Asteroides
+  for (const r of rocks){
+    r.y += r.vy*dt; r.x += r.vx*dt; r.rot += r.vr*dt;
+    if (r.x < r.r || r.x > W - r.r) r.vx *= -1;
+    const d = Math.hypot(r.x - ship.x, r.y - ship.y);
+    if (d < r.r*.85 + ship.r){
+      if (ship.shield){
+        ship.shield = false; r.dead = true; burst(r.x, r.y, '#5ee6ff', 26); burst(r.x, r.y, '#8d7f74', 16);
+        shake = 8; float(ship.x, ship.y - 30, 'Escudo roto', '#5ee6ff');
+      } else { die(); return; }
+    } else if (!r.near && r.y > ship.y && d < r.r + ship.r + 22){
+      r.near = true; score += 25; float(ship.x, ship.y - 28, '¡Por los pelos! +25', '#ff5d8f');
+    }
+  }
+  rocks = rocks.filter(r => !r.dead && r.y < H + 60);
+
+  // Monedas
+  for (const g of golds){
+    g.ph += dt*6;
+    if (ship.magnet > 0){
+      const dx = ship.x - g.x, dy = ship.y - g.y, d = Math.hypot(dx,dy);
+      if (d < 180){ g.x += dx/d * 420*dt; g.y += dy/d * 420*dt; }
+    }
+    g.y += g.vy*dt;
+    if (Math.hypot(g.x - ship.x, g.y - ship.y) < g.r + ship.r + 4){
+      g.dead = true; combo = Math.min(combo + 1, 10); comboTimer = 1.4;
+      const mult = Math.min(5, 1 + Math.floor(combo/2));
+      const val = 10 * mult; score += val; coins++;
+      burst(g.x, g.y, '#ffc83d', 8, 140);
+      float(g.x, g.y - 10, mult > 1 ? `+${val} x${mult}` : `+${val}`, '#ffc83d');
+    }
+  }
+  golds = golds.filter(g => !g.dead && g.y < H + 30);
+
+  // Potenciadores
+  for (const p of powers){
+    p.y += p.vy*dt; p.ph += dt*4;
+    if (Math.hypot(p.x - ship.x, p.y - ship.y) < p.r + ship.r){
+      p.dead = true;
+      if (p.kind === 'shield'){ ship.shield = true; float(p.x, p.y, 'Escudo', '#5ee6ff'); }
+      else { ship.magnet = 8; float(p.x, p.y, 'Imán 8 s', '#c38bff'); }
+      burst(p.x, p.y, p.kind === 'shield' ? '#5ee6ff' : '#c38bff', 18);
+    }
+  }
+  powers = powers.filter(p => !p.dead && p.y < H + 30);
+
+  updateHud();
+}
+
+function die(){
+  state = 'dying'; deadTimer = .9; shake = 14;
+  burst(ship.x, ship.y, '#ff7a59', 40, 300); burst(ship.x, ship.y, '#bfe9ff', 30, 240); burst(ship.x, ship.y, '#ffc83d', 20, 200);
+}
+
+function gameOver(){
+  state = 'over';
+  const s = Math.floor(score), isRecord = s > best;
+  if (isRecord){ best = s; saveBest(); }
+  $('oScore').textContent = s.toLocaleString('es-ES');
+  $('oTime').textContent = t.toFixed(1).replace('.', ',');
+  $('newRecord').hidden = !isRecord;
+  $('oBest').textContent = isRecord ? 'Lo has superado. ¿Puedes más?' : `Tu récord: ${best.toLocaleString('es-ES')} · te faltan ${(best - s).toLocaleString('es-ES')} puntos`;
+  updateHud(); show('over');
+  setTimeout(() => $('againBtn').focus({ preventScroll: true }), 50);
+}
+
+function updateHud(){
+  $('hScore').textContent = Math.floor(score).toLocaleString('es-ES');
+  $('hCoins').textContent = coins;
+  $('hBest').textContent = best.toLocaleString('es-ES');
+}
+
+// ====== Dibujo ======
+function draw(){
+  ctx.save();
+  ctx.fillStyle = '#0a1328'; ctx.fillRect(0,0,W,H);
+  if (shake && !reduced) ctx.translate(rand(-shake,shake), rand(-shake,shake));
+
+  // nebulosa
+  const g = ctx.createRadialGradient(W*.7, H*.2, 10, W*.7, H*.2, Math.max(W,H)*.8);
+  g.addColorStop(0, '#2a2f6a55'); g.addColorStop(1, '#0a132800');
+  ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+
+  for (const s of stars){
+    ctx.globalAlpha = .3 + s.z*.7; ctx.fillStyle = s.z > .8 ? '#ffffff' : '#93a3c8';
+    const len = (state === 'play') ? 1 + s.z * Math.min(10, t*.15) : 1;
+    ctx.fillRect(s.x*W, s.y*H, s.z*1.8, s.z*1.8*len);
+  }
+  ctx.globalAlpha = 1;
+
+  if (!ship){ ctx.restore(); return; }
+
+  // monedas
+  for (const c of golds){
+    const sx = Math.abs(Math.cos(c.ph));
+    ctx.fillStyle = '#ffc83d'; ctx.beginPath(); ctx.ellipse(c.x, c.y, c.r*Math.max(.25,sx), c.r, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#fff1b8'; ctx.beginPath(); ctx.ellipse(c.x - 2*sx, c.y - 2, c.r*.35*Math.max(.25,sx), c.r*.45, 0, 0, Math.PI*2); ctx.fill();
+  }
+
+  // potenciadores
+  for (const p of powers){
+    const col = p.kind === 'shield' ? '#5ee6ff' : '#c38bff';
+    ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.globalAlpha = .6 + .4*Math.sin(p.ph);
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 4, 0, Math.PI*2); ctx.stroke(); ctx.globalAlpha = 1;
+    ctx.fillStyle = col; ctx.font = '700 14px "Chakra Petch", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(p.kind === 'shield' ? 'E' : 'I', p.x, p.y + 1);
+  }
+
+  // asteroides
+  for (const r of rocks){
+    ctx.save(); ctx.translate(r.x, r.y); ctx.rotate(r.rot);
+    ctx.beginPath();
+    r.verts.forEach((v,i) => { const a = i / r.verts.length * Math.PI*2; const px = Math.cos(a)*r.r*v, py = Math.sin(a)*r.r*v; i ? ctx.lineTo(px,py) : ctx.moveTo(px,py); });
+    ctx.closePath(); ctx.fillStyle = '#6e6259'; ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = '#a8998c'; ctx.stroke();
+    ctx.fillStyle = '#574d46';
+    ctx.beginPath(); ctx.arc(r.r*.25, -r.r*.2, r.r*.22, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(-r.r*.3, r.r*.3, r.r*.14, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  // partículas
+  for (const p of parts){ ctx.globalAlpha = Math.max(0, p.life / p.max); ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.size, p.size); }
+  ctx.globalAlpha = 1;
+
+  // nave
+  if (state === 'play' || state === 'pause'){
+    ctx.save(); ctx.translate(ship.x, ship.y); ctx.rotate(Math.max(-.4, Math.min(.4, ship.tilt)));
+    if (ship.magnet > 0){
+      ctx.strokeStyle = '#c38bff'; ctx.globalAlpha = .25 + .15*Math.sin(t*10); ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(0, 0, 180, 0, Math.PI*2); ctx.stroke(); ctx.globalAlpha = 1;
+    }
+    ctx.fillStyle = '#ff7a59'; ctx.beginPath(); ctx.moveTo(-6,12); ctx.lineTo(0, 22 + Math.random()*8); ctx.lineTo(6,12); ctx.fill();
+    ctx.fillStyle = '#bfe9ff';
+    ctx.beginPath(); ctx.moveTo(0,-18); ctx.lineTo(14,14); ctx.lineTo(5,9); ctx.lineTo(-5,9); ctx.lineTo(-14,14); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#ff5d8f'; ctx.beginPath(); ctx.moveTo(-14,14); ctx.lineTo(-9,4); ctx.lineTo(-6,9); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(14,14); ctx.lineTo(9,4); ctx.lineTo(6,9); ctx.fill();
+    ctx.fillStyle = '#14234a'; ctx.beginPath(); ctx.ellipse(0, -3, 3.5, 6, 0, 0, Math.PI*2); ctx.fill();
+    if (ship.shield){
+      ctx.strokeStyle = '#5ee6ff'; ctx.lineWidth = 2.5; ctx.globalAlpha = .7 + .3*Math.sin(t*8);
+      ctx.beginPath(); ctx.arc(0, 0, ship.r + 10, 0, Math.PI*2); ctx.stroke(); ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+  }
+
+  // combo
+  if (combo >= 2 && (state === 'play')){
+    const mult = Math.min(5, 1 + Math.floor(combo/2));
+    ctx.fillStyle = '#ffc83d'; ctx.globalAlpha = Math.min(1, comboTimer * 1.5);
+    ctx.font = '400 18px Bungee, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    ctx.fillText(`COMBO x${mult}`, W/2, 92);
+    ctx.globalAlpha = 1;
+  }
+
+  // textos flotantes
+  ctx.font = '700 14px "Chakra Petch", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const f of texts){ ctx.globalAlpha = Math.max(0, f.life); ctx.fillStyle = f.color; ctx.fillText(f.txt, f.x, f.y); }
+  ctx.globalAlpha = 1;
+
+  ctx.restore();
+}
+
+// ====== Arranque ======
+function boot(){
+  resize(); makeStars(); reset(); updateHud();
+  requestAnimationFrame(loop);
+}
+window.claude?.hot?.ready ? window.claude.hot.ready(boot) : boot();
+})();
+</script>
+</body>
+</html>
